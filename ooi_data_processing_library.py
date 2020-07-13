@@ -3,7 +3,7 @@ import numpy as np
 import json
 import os
 from matplotlib import pyplot as plt
-from obspy import read,Stream, Trace
+from obspy import read, Stream, Trace
 from obspy.core import UTCDateTime
 import math
 from matplotlib import mlab
@@ -124,13 +124,19 @@ class OOIHydrophoneData:
         self.psd_list = None
 
 
-    def __web_crawler_noise(self, day_str):
+    def _web_crawler_noise(self, day_str):
         '''
-        get URLs for a specific day from OOI raw data server
+        Request URLs for a specific day from OOI raw data server.
 
-        day_str (str): date for which URLs are requested; format: yyyy/mm/dd, e.g. 2016/07/15
+        Parameters
+        ----------
+        day_str : str
+            Date for which URLs are requested; format: '/yyyy/mm/dd/', e.g. '/2016/07/15/'
 
-        return ([str]): list of URLs, each URL refers to one data file. If no data is avauilable for
+        Returns
+        -------
+        list
+            list of URL strings, where each URL refers to one data file. If no data is available for
             specified date, None is returned.
         '''
 
@@ -169,11 +175,17 @@ class OOIHydrophoneData:
     def _freq_dependent_sensitivity_correct(self, N):
         #TODO
         '''
-        Apply a frequency dependent sensitivity correction to the acoustic data (in frequency domain).
+        Apply a frequency dependent sensitivity correction to the acoustic data.
 
-        N (int): length of the data segment
+        Parameters
+        ----------
+        N : int
+            Length of the data segment
 
-        return (np.array): array with correction coefficient for every frequency 
+        Returns
+        -------
+        numpy.array
+            Numpy array with sensitivity correction coefficient for every frequency bin. 
         '''
         f_calib = [0, 13500, 27100, 40600, 54100]
         sens_calib = [169, 169.4, 168.1, 169.7, 171.5]
@@ -185,17 +197,39 @@ class OOIHydrophoneData:
 
     def get_acoustic_data(self, starttime, endtime, node, fmin=None, fmax=None):
         '''
-        Get acoustic data for specific time frame and node:
+        Get acoustic data for specific time frame and hydrophone node.
 
-        start_time (datetime.datetime): time of the first noise sample
-        end_time (datetime.datetime): time of the last noise sample
-        node (str): hydrophone
-        fmin (float): lower cutoff frequency of hydrophone's bandpass filter. Default is None which results in no filtering.
-        fmax (float): higher cutoff frequency of hydrophones bandpass filter. Default is None which results in no filtering.
-        print_exceptions (bool): whether or not exeptions are printed in the terminal line
+        Parameters
+        ----------
+        start_time : datetime.datetime
+            Time of the first data point.
+        end_time : datetime.datetime
+            Time of the last date point.
+        node : str
+            indicates hydrophone location as listed below
+            ____________________________________________
+            |Node Name |        Hydrophone Name        |
+            |__________|_______________________________|
+            |'/LJ01D'  | Oregon Shelf Base Seafloor    |
+            |__________|_______________________________|
+            |'/LJ01A   | Oregon Slope Base Seafloore   |
+            |__________|_______________________________|
+            |'/PC01A'  | Oregan Slope Base Shallow     |
+            |__________|_______________________________|
+            |'/PC03A'  | Axial Base Shallow Profiler   |
+            |__________|_______________________________|
+            |'/LJ01C'  | Oregon Offshore Base Seafloor |
+            |__________|_______________________________| 
+        fmin : float, optional
+            Lower cutoff frequency of Butterworth bandpass filter. If fmin=None, no filtering will be applied to the data.
+        fmax : float, optional
+            Higher cutoff frequency of Butterworth bandpass filter. If fmax=None, no filtering will be applied to the data.
 
-        return (obspy.core.stream.Stream): obspy Stream object containing one Trace and date
-            between start_time and end_time. Returns None if no data are available for specified time frame
+        Returns
+        -------
+        obspy.core.stream.Stream
+            obspy Stream object containing one Trace with data between start_time and end_time. Returns None if no data are
+            available for specified time and node.
 
         '''
 
@@ -207,7 +241,7 @@ class OOIHydrophoneData:
         
         # get URLs
         day_start = UTCDateTime(self.starttime.year, self.starttime.month, self.starttime.day, 0, 0, 0)
-        data_url_list = self.__web_crawler_noise(self.starttime.strftime("/%Y/%m/%d/"))
+        data_url_list = self._web_crawler_noise(self.starttime.strftime("/%Y/%m/%d/"))
         if data_url_list == None:
             if self.print_exceptions:
                 print('No data available for specified day and node. Please change the day or use a differnt node')
@@ -217,7 +251,7 @@ class OOIHydrophoneData:
         
         day_start = day_start + 24*3600
         while day_start < self.endtime:
-            data_url_list.extend(self.__web_crawler_noise(self.starttime.strftime("/%Y/%m/%d/")))
+            data_url_list.extend(self._web_crawler_noise(self.starttime.strftime("/%Y/%m/%d/")))
             day_start = day_start + 24*3600
         
         if self.limit_seed_files:
