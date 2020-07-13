@@ -914,3 +914,51 @@ class Psd:
 
         with open(filename, 'w+') as outfile:
             json.dump(dct, outfile)
+
+    def log_psd(self, fc_min=10, fc_max=None, bin_width_oct=1, psd_mode='log', avg_mode='median'):
+        """
+        Computes PSD for a logarithmic frequency scale. The center frequencies of neighboring bands are
+        2**bin_width_oct apart from each other. All samples that fall into one octave abnd are averaged.
+
+        Parameters
+        ----------
+        fc_min : float or int, optional
+            Center frequency of first band in Hz.
+        fc_max : float or int, optional
+            Center frequency of last band in Hz. If fc_max !=  2**(k*bin_width_oct) for some integer k,
+            the center frequency of the last band is the fist valid center frequency greater than fc_max.
+            If fc_max=None, all values above fc_min / 2**(bin_width_oct/2) are mapped into their
+            respective octave band.
+        bin_width_oct : floar or int, optional
+            Band width as fraction of one octave. That is, for example if bin_width_oct=1/3, the PSD is
+            computed for 1/3-octave bands.
+        psd_mode : str, 'log' (default) or 'lin'
+            Scale of the output values of the PSD.
+        avg_mode : str, 'median' (default) or 'mean'
+            Method for averaging the values that fall into a single band. Median averaging is usually
+            prefered to remove unwanted spectral lines.
+        """
+        freq = psd_lin.freq
+        psd = psd_lin.values
+        fc_list, fn_list = compute_band_freqs(fc_min, fc_max)
+        psd_third_octave = np.zeros(len(fc_list))
+        nf_per_band = np.zeros(len(fc_list))
+        
+        for i in range(len(fc_list)):
+            cnt = 1
+            tmp = []
+            for k in range(len(freq)):
+                if freq[k] >= fn_list[i] and freq[k] < fn_list[i+1]:
+                    tmp.append(psd[k])
+                    psd_third_octave[i] = (cnt - 1) / cnt * psd_third_octave[i] + 1/cnt * psd[k]
+                    cnt += 1
+                if freq[k] >= fn_list[i+1]:
+                    if avg_mode == 'median':
+                        psd_third_octave[i] = np.median(tmp)
+                    nf_per_band[i] = len(tmp)
+                    break
+                    
+        if mode == 'log':
+            psd_third_octave = 10 * np.log10(psd_third_octave)        
+        
+        return fc_list, psd_third_octave, nf_per_band
