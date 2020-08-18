@@ -938,27 +938,57 @@ class Psd:
             Method for averaging the values that fall into a single band. Median averaging is usually
             prefered to remove unwanted spectral lines.
         """
-        freq = psd_lin.freq
-        psd = psd_lin.values
-        fc_list, fn_list = compute_band_freqs(fc_min, fc_max)
-        psd_third_octave = np.zeros(len(fc_list))
-        nf_per_band = np.zeros(len(fc_list))
+
+        fc_list, fn_list = self._compute_band_freqs(fc_min, fc_max, bin_width_oct)
+        psd_log = np.zeros(len(fc_list))
+        ns_per_band = np.zeros(len(fc_list))
         
         for i in range(len(fc_list)):
             cnt = 1
             tmp = []
-            for k in range(len(freq)):
-                if freq[k] >= fn_list[i] and freq[k] < fn_list[i+1]:
-                    tmp.append(psd[k])
-                    psd_third_octave[i] = (cnt - 1) / cnt * psd_third_octave[i] + 1/cnt * psd[k]
+            for k in range(len(self.freq)):
+                if self.freq[k] >= fn_list[i] and self.freq[k] < fn_list[i+1]:
+                    tmp.append(self.values[k])
+                    psd_log[i] = (cnt - 1) / cnt * psd_log[i] + 1/cnt * self.values[k]
                     cnt += 1
-                if freq[k] >= fn_list[i+1]:
+                if self.freq[k] >= fn_list[i+1]:
                     if avg_mode == 'median':
-                        psd_third_octave[i] = np.median(tmp)
-                    nf_per_band[i] = len(tmp)
+                        psd_log[i] = np.median(tmp)
+                    ns_per_band[i] = len(tmp)
                     break
                     
-        if mode == 'log':
-            psd_third_octave = 10 * np.log10(psd_third_octave)        
+        if psd_mode == 'log':
+            psd_log = 10 * np.log10(psd_log)        
         
-        return fc_list, psd_third_octave, nf_per_band
+        #return fc_list, psd_log, ns_per_band
+        return Psd(fc_list, psd_log)
+
+    def _compute_band_freqs(self, fc_min, fc_max, bin_width_oct):
+        """
+        Compute band center frequency and limits for logarithmic frequency scale.
+
+        Parameters
+        ----------
+        fc_min : float or int
+            Center frequency of first band in Hz.
+        fc_max : float or int
+            Center frequency of last band in Hz. If fc_max !=  2**(k*bin_width_oct) for some integer k,
+            the center frequency of the last band is the fist valid center frequency greater than fc_max.
+        bin_width_oct : floar or int
+            Band width as fraction of one octave. That is, for example if bin_width_oct=1/3, the PSD is
+            computed for 1/3-octave bands.
+
+        Returns
+        -------
+        tuple of arrays
+            Two arrays, one containg the center frequencies and one the band limits.  
+        """
+        band_limits = [fc_min / 2**(bin_width_oct/2)]
+        center_freqs = []
+        tmp = fc_min
+        while tmp < fc_max:
+            center_freqs.append(tmp)
+            band_limits.append(tmp * 2**(bin_width_oct/2))
+            tmp = tmp * 2**(bin_width_oct)
+            
+        return np.array(center_freqs), np.array(band_limits)
