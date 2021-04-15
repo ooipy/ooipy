@@ -23,6 +23,7 @@ import warnings
 import ooipy
 import pandas as pd
 import os
+import xarray as xr
 
 
 class HydrophoneData(Trace):
@@ -59,18 +60,11 @@ class HydrophoneData(Trace):
         self.psd_list = None
         self.type = None
 
-    # TODO: use correct frequency response for all hydrophones
     def frequency_calibration(self, N):
-        # TODO
         """
         Apply a frequency dependent sensitivity correction to the
         acoustic data based on the information from the calibration
         sheets.
-        TODO Add for all broadband hydrophones
-        !!! Currently only implemented for Oregon Offshore Base Seafloor
-        and Oregon Shelf Base Seafloor hydrophone. For all other
-        hydrophones, an average sensitivity of -169dBV/1uPa is assumed
-        !!!
 
         Parameters
         ----------
@@ -732,12 +726,23 @@ def _psd_mp_helper(ooi_hyd_data_obj, win, L, overlap, avg_method, interpolate,
     return ooi_hyd_data_obj.psd
 
 
-class Spectrogram:
+class Spectrogram(xr.DataArray):
     """
-    A class used to represent a spectrogram object.
+    Class designed to represent a hydrophone spectrogram object. This class
+        is built as a wrapper to an xarray.DataArray and when initialized, the
+        diminsions are labeled ['time','frequency'].
 
-    Attributes
+    TODO attributes of xarray
+
+    Methods
     ----------
+    visualize(plot_spec=True, save_spec=False)
+        soon to be deprecated
+    save(filename)
+        saves spectrogram object to filename as pickle file
+    plot(**kwargs)
+        calls :meth:`ooipy.hydrophone.basic.plot_spectrogram`
+    
     time : 1-D array of float or datetime objects
         Indices of time-bins of spectrogram.
     freq : 1-D array of float
@@ -746,13 +751,15 @@ class Spectrogram:
         Values of the spectrogram. For each time-frequency-bin pair there has
         to be one entry in values. That is, if time has  length N and freq
         length M, values is a NxM array.
-
     """
-
-    def __init__(self, time, freq, values):
-        self.time = time
-        self.freq = freq
-        self.values = values
+    __slots__ = ()
+    def __init__(
+        self, time=np.array([]), freq=np.array([]), values=np.array([]),
+        name='Spectrogram'):
+        super().__init__(
+            data=values, coords={'time':time, 'frequency':freq},
+            dims=['time','frequency'], name=None, attrs=None, indexes=None,
+            fastpath=False)
 
     def visualize(self, plot_spec=True, save_spec=False,
                   filename='spectrogram.png', title='spectrogram',
